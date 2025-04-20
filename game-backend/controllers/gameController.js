@@ -1,6 +1,7 @@
 const gameService = require('../services/gameService');
 const tileQueueService = require('../services/tileQueueService');
 const potentialTileService = require('../services/potentialTileService');
+const GameError = require("../utils/GameError");
 
 exports.startGame = async (req, res) => {
     try{
@@ -44,9 +45,12 @@ exports.getPotentialTiles = async (req, res) => {
 exports.placeTile = async (req, res) => {
     try{
         const { x, y } = req.body;
-        const result = gameService.processTilePlacement(req.params.id, x, y);
+        const result = await gameService.processTilePlacement(req.params.id, x, y);
         res.status(201).json({success: true, data: result.data});
     }catch(err){
+        if(err instanceof GameError){
+            return res.status(err.statusCode).json({error: "Failed to create a game: ", details: err.message});
+        }
         res.status(500).json({error: "Failed to place a tile"});
     }
 }

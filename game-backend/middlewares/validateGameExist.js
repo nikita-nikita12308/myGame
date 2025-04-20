@@ -5,7 +5,7 @@ exports.validateGameExist = async (req, res, next) => {
 
     const game = await gameService.getGameData(gameId);
 
-    if (!game) {
+    if (!game.gameData) {
         return res.status(404).json({ error: 'No game found with id: ' + gameId });
     }
 
