@@ -5,7 +5,7 @@ const tileQueueService = require("../services/tileQueueService.js");
 const potentialTileService = require("../services/potentialTileService.js");
 
 const redis = require("../config/redis");
-const {getNeighbourPositions} = require("../utils/getNeighbourPositions");
+const {getNeighbourPositions, calculateBonusesFromNeighbours} = require("../utils/getNeighbourPositions");
 const GameError = require("../utils/GameError");
 
 
@@ -62,28 +62,16 @@ exports.processTilePlacement = async (gameId, x, y) => {
             throw new GameError("Potential Tile could not be found. Wrong tile coordinates.", 403)
         }
 
-
-
         const [currentTile, ...tileQueue] = await redis.lrange(`tileQueue:${gameId}`, 0, -1);
         if (!currentTile) {
             throw new GameError("Tile cache is expired or missing, update tile queue", 409)
         }
         // move on queue
-        // await tileQueueService.getTileQueue()
+        await tileQueueService.getTileQueue()
 
-        const tileType = await TileType.findOne({
-            where: {
-                subtype: currentTile,
-            },
-        })
-
+        const tileType = await TileType.findOne({where: {subtype: currentTile,},})
         // placement rules
-
-        const placeRules = await PlacementRules.findAll({
-            where: {
-                tileTypeId: tileType.id
-            }
-        })
+        const placeRules = await PlacementRules.findAll({where: {tileTypeId: tileType.id}, raw: true})
 
         const neighbourTiles = await Tile.findAll({
             where: {
@@ -92,14 +80,17 @@ exports.processTilePlacement = async (gameId, x, y) => {
             }
         })
 
-        neighbourTiles.forEach(tile => {
-            console.log(tile.tileTypeId)
-        })
-        if(placeRules.length > 0){
-            //calculate bonuses
-            // neighbour tiles
-            console.log(neighbourTiles)
-            console.log("Rules calculating")
+        const neighbourSubtypeId = await TileType.findAll({where: {subtype: placeRules[0].neighbourSubtype},})
+
+        if(!placeRules.length) {return null}
+
+        const appliedBonuses = calculateBonusesFromNeighbours(neighbourTiles, placeRules[0], neighbourSubtypeId[0].dataValues.id, x, y)
+
+        //later i will add createTile, now just return data
+
+        return {
+            status: "success",
+            appliedBonuses,
         }
 
     }catch(err){
